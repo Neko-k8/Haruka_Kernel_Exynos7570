@@ -17,13 +17,13 @@
 # Main Dir
 CR_DIR=$(pwd)
 # Define toolchan path
-CR_TC=/home/runner/asarre/linaro-toolchain-latest/bin/aarch64-linux-gnu-
+CR_TC=/home/tuesipipele/prebuilts_gcc_linux-x86_aarch64_aarch64-linaro-7/bin/aarch64-linux-gnu-
 # Define proper arch and dir for dts files
 CR_DTS=arch/arm64/boot/dts
 # Define boot.img out dir
 CR_OUT=$CR_DIR/PHANTOM/Out
 CR_PRODUCT=$CR_DIR/PHANTOM/Product
-# DTS 
+# DTS
 CR_MDTJ5=$CR_DIR/PHANTOM/MakefileJ5
 CR_MDTJ4=$CR_DIR/PHANTOM/MakefileJ4
 CR_MDTJ3=$CR_DIR/PHANTOM/MakefileJ3
@@ -37,8 +37,8 @@ CR_KERNEL=$CR_DIR/arch/arm64/boot/Image
 # Compiled dtb by dtbtool
 CR_DTB=$CR_DIR/boot.img-dtb
 # Kernel Name and Version
-CR_VERSION=V2
-CR_NAME=PhantomKernel
+CR_VERSION=V0.02
+CR_NAME=Haruka_Kernel
 # Thread count
 CR_JOBS=$(nproc --all)
 # Target android version and platform (7/n/8/o/9/p)
@@ -79,7 +79,7 @@ CR_CONFIG_ONEUI=exynos7570-oneui_defconfig
 CR_CONFIG_SPLIT=NULL
 CR_CONFIG_PHANTOM=exynos7570-phantom_defconfig
 # Prefixes
-CR_ROOT="0"
+CR_ROOT="1"
 CR_PERMISSIVE="0"
 CR_HALLIC="0"
 # Flashable Variables

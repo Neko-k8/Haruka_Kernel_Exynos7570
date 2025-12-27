@@ -1,0 +1,1 @@
+#define UTS_RELEASE "3.18.140-Haruka_Kernel-V0.02-G570X-ONEUI"

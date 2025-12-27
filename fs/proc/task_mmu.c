@@ -315,16 +315,56 @@ static int do_maps_open(struct inode *inode, struct file *file,
  * Indicate if the VMA is a stack for the given task; for
  * /proc/PID/maps that is the stack of the main task.
  */
+/*
+ * Indicate if the VMA is a stack for the given task; for
+ * /proc/PID/maps that is the stack of the main task.
+ */
 static int is_stack(struct proc_maps_private *priv,
-		    struct vm_area_struct *vma)
+					struct vm_area_struct *vma)
 {
-	/*
-	 * We make no effort to guess what a given thread considers to be
-	 * its "stack".  It's not even well-defined for programs written
-	 * languages like Go.
-	 */
 	return vma->vm_start <= vma->vm_mm->start_stack &&
-		vma->vm_end >= vma->vm_mm->start_stack;
+	vma->vm_end >= vma->vm_mm->start_stack;
+}
+
+/*
+ * Helper function for standard VMA header printing (Backported for 3.18)
+ */
+static void show_vma_header_prefix(struct seq_file *m,
+								   unsigned long start, unsigned long end,
+								   vm_flags_t flags, unsigned long long pgoff,
+								   dev_t dev, unsigned long ino)
+{
+	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
+	seq_printf(m, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
+			   start,
+			end,
+			flags & VM_READ ? 'r' : '-',
+			flags & VM_WRITE ? 'w' : '-',
+			flags & VM_EXEC ? 'x' : '-',
+			flags & VM_MAYSHARE ? 's' : 'p',
+			pgoff,
+			MAJOR(dev), MINOR(dev), ino);
+}
+
+/*
+ * Helper function for FAKE VMA header printing (Spoofs Exec permission)
+ *
+ */
+static void show_vma_header_prefix_fake(struct seq_file *m,
+										unsigned long start, unsigned long end,
+										vm_flags_t flags, unsigned long long pgoff,
+										dev_t dev, unsigned long ino)
+{
+	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
+	seq_printf(m, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
+			   start,
+			end,
+			flags & VM_READ ? 'r' : '-',
+			flags & VM_WRITE ? 'w' : '-',
+			flags & VM_EXEC ? '-' : '-',
+			flags & VM_MAYSHARE ? 's' : 'p',
+			pgoff,
+			MAJOR(dev), MINOR(dev), ino);
 }
 
 static void
@@ -339,29 +379,42 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 	unsigned long start, end;
 	dev_t dev = 0;
 	const char *name = NULL;
+	struct dentry *dentry;
+
+
+	start = vma->vm_start;
+	end = vma->vm_end;
 
 	if (file) {
 		struct inode *inode = file_inode(vma->vm_file);
 		dev = inode->i_sb->s_dev;
 		ino = inode->i_ino;
 		pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;
+
+		/* --- LOGIC SPOOFING --- */
+		dentry = file->f_path.dentry;
+		if (dentry && dentry->d_name.name) {
+			const char *path = (const char *)dentry->d_name.name;
+
+
+			if (strstr(path, "lineage")) {
+				show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
+				name = "/system/framework/framework-res.apk";
+				goto done;
+			}
+
+
+			if (strstr(path, "jit-zygote-cache")) {
+				show_vma_header_prefix_fake(m, start, end, flags, pgoff, dev, ino);
+				goto bypass; /* Nhảy qua đoạn in header gốc */
+			}
+		}
 	}
 
-	/* We don't show the stack guard page in /proc/maps */
-	start = vma->vm_start;
-	end = vma->vm_end;
 
-	seq_setwidth(m, 25 + sizeof(void *) * 6 - 1);
-	seq_printf(m, "%08lx-%08lx %c%c%c%c %08llx %02x:%02x %lu ",
-			start,
-			end,
-			flags & VM_READ ? 'r' : '-',
-			flags & VM_WRITE ? 'w' : '-',
-			flags & VM_EXEC ? 'x' : '-',
-			flags & VM_MAYSHARE ? 's' : 'p',
-			pgoff,
-			MAJOR(dev), MINOR(dev), ino);
+	show_vma_header_prefix(m, start, end, flags, pgoff, dev, ino);
 
+	bypass:
 	/*
 	 * Print the dentry name for named mappings, and a
 	 * special [heap] marker for the heap:
@@ -386,23 +439,23 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 		}
 
 		if (vma->vm_start <= mm->brk &&
-		    vma->vm_end >= mm->start_brk) {
+			vma->vm_end >= mm->start_brk) {
 			name = "[heap]";
-			goto done;
-		}
+		goto done;
+			}
 
-		if (is_stack(priv, vma)) {
-			name = "[stack]";
-			goto done;
-		}
+			if (is_stack(priv, vma)) {
+				name = "[stack]";
+				goto done;
+			}
 
-		if (vma_get_anon_name(vma)) {
-			seq_pad(m, ' ');
-			seq_print_vma_name(m, vma);
-		}
+			if (vma_get_anon_name(vma)) {
+				seq_pad(m, ' ');
+				seq_print_vma_name(m, vma);
+			}
 	}
 
-done:
+	done:
 	if (name) {
 		seq_pad(m, ' ');
 		seq_puts(m, name);
